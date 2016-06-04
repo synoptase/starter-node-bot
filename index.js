@@ -1,7 +1,16 @@
-var Botkit = require('botkit')
+/**
+* @Author: Benjamin Grelié <benjamin>
+* @Date:   31-05-2016
+* @Email:  benjamin@printicapp.com
+* @Last modified by:   benjamin
+* @Last modified time: 04-06-2016
+*/
 
-var token = process.env.SLACK_TOKEN
-
+var config   = require('./config/vars')
+var Botkit   = require('botkit')
+var Invoicer = require('./modules/invoicer')
+var debug    = require('debug')('botkit')
+var token    = process.env.SLACK_TOKEN
 var controller = Botkit.slackbot({
   // reconnect to Slack RTM when connection goes bad
   retry: Infinity,
@@ -10,7 +19,7 @@ var controller = Botkit.slackbot({
 
 // Assume single team mode if we have a SLACK_TOKEN
 if (token) {
-  console.log('Starting in single-team mode')
+  debug('Starting in single-team mode')
   controller.spawn({
     token: token
   }).startRTM(function (err, bot, payload) {
@@ -18,13 +27,29 @@ if (token) {
       throw new Error(err)
     }
 
-    console.log('Connected to Slack RTM')
+    debug('Connected to Slack RTM')
   })
 // Otherwise assume multi-team mode - setup beep boop resourcer connection
 } else {
-  console.log('Starting in Beep Boop multi-team mode')
+  debug('Starting in Beep Boop multi-team mode')
   require('beepboop-botkit').start(controller, { debug: true })
 }
+
+controller.hears('invoice', ['direct_message'], function (bot, message) {
+  var iv = new Invoicer(config)
+  var sp = iv.getSpreadsheet()
+  var text = "Looks like i've got a spreadsheet:"
+  var attachments = [{
+    fallback: text,
+    pretext: 'We bring bots to life. :sunglasses: :thumbsup:',
+    title: 'Host, deploy and share your bot in seconds.',
+    image_url: 'https://storage.googleapis.com/beepboophq/_assets/bot-1.22f6fb.png',
+    title_link: 'https://beepboophq.com/',
+    text: text,
+    color: '#7CD197'
+  }]
+  bot.reply(message, {attachments: attachments})
+})
 
 controller.on('bot_channel_join', function (bot, message) {
   bot.reply(message, "I'm here!")
