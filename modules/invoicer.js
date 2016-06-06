@@ -3,11 +3,11 @@
 * @Date:   03-06-2016
 * @Email:  benjamin@printicapp.com
 * @Last modified by:   benjamin
-* @Last modified time: 04-06-2016
+* @Last modified time: 06-06-2016
 */
 
-var sheets = require("google-spreadsheets");
 var google = require('googleapis');
+var moment = require('moment');
 var debug  = require('debug')('invoicer');
 
 var Invoicer = function(config){
@@ -23,20 +23,92 @@ var Invoicer = function(config){
       null
     );
 
-    _ready = true;
+    _ready = true
   }
-  catch(err){
+  catch(err) {
     //something went wrong
     throw new Error('Google api init failed! ' + err);
   }
 
+  Array.prototype.toInvoice = function () {
+    var columns = [ "team", "label", "invoice_date", "amount", "capex", "recurring", "created_at" ]
+    var r = this.reduce(function(result, field, index) {
+      result[columns[index]] = field;
+      return result
+    }, {})
+    return r
+  };
+
+  function getLastRow(myRange) {
+    var lastRow = myRange.length
+    for (; myRange[lastRow - 1] == "" || myRange[lastRow - 1] == 0 && lastRow > 0 ; lastRow--)  {
+       /*nothing to do*/
+    }
+
+    return myRange[lastRow - 1]
+  }
+
+  function getLastRowNumber(myRange) {
+    var lastRow = myRange.length
+    for (; myRange[lastRow - 1] == "" || myRange[lastRow - 1] == 0 && lastRow > 0 ; lastRow--)  {
+       /*nothing to do*/
+    }
+
+    return lastRow
+  }
+
+  function getSheet(callback) {
+    var sheets = google.sheets('v4');
+    sheets.spreadsheets.values.get({
+      auth: authClient,
+      spreadsheetId: sheet_key,
+      range: 'Data!A1:G',
+    }, function(err, response) {
+      if (err) {
+        debug('The API returned an error: ' + err);
+        return;
+      }
+      callback(response)
+    })
+  }
+
+  function readLastRow(callback) {
+    getSheet(function(response) {
+      lastRow = getLastRow(response.values)
+      debug(lastRow)
+      callback(lastRow.toInvoice())
+    })
+  }
+
+  function writeRow(message, callback) {
+    getSheet(function(response) {
+      lastRowNumber = getLastRowNumber(response.values) + 1
+      data = message.text.split('invoice ').pop().split(',').map(Function.prototype.call, String.prototype.trim)
+      data.push(moment().unix())
+      var sheets = google.sheets('v4');
+      sheets.spreadsheets.values.update({
+        auth:             authClient,
+        spreadsheetId:    sheet_key,
+        range:            'Data!A' + lastRowNumber + ':G' + lastRowNumber,
+        valueInputOption: 'USER_ENTERED',
+        resource:         { values: [data] }
+      }, function(err, response) {
+        if (err) {
+          debug('The API returned an error: ' + err);
+          return;
+        }
+        callback()
+      })
+    })
+  }
+
   return {
-      getSpreadsheet: function(){
-        sheets({ key: sheet_key, auth: authClient },
-          (err, spreadsheet) => {
-            if (err) { return }
-          }
-        )
+      inputInvoice: function(message, callback) {
+        writeRow(message, callback)
+      },
+
+      lastInvoice: function(callback) {
+        readLastRow(callback)
       }
   };
 };

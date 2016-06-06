@@ -3,12 +3,13 @@
 * @Date:   31-05-2016
 * @Email:  benjamin@printicapp.com
 * @Last modified by:   benjamin
-* @Last modified time: 04-06-2016
+* @Last modified time: 06-06-2016
 */
 
 var config   = require('./config/vars')
 var Botkit   = require('botkit')
 var Invoicer = require('./modules/invoicer')
+var moment = require('moment')
 var debug    = require('debug')('botkit')
 var token    = process.env.SLACK_TOKEN
 var controller = Botkit.slackbot({
@@ -35,20 +36,30 @@ if (token) {
   require('beepboop-botkit').start(controller, { debug: true })
 }
 
+controller.hears('last invoice', ['direct_message'], function (bot, message) {
+  var iv = new Invoicer(config)
+  iv.lastInvoice(function(invoice) {
+    var attachments = [];
+    var attachment = {
+      ts: invoice.created_at,
+      title: invoice.label,
+      color: 'good',
+      fields: []
+    }
+    attachment.fields.push({title: 'Date',         value: invoice.invoice_date,       short: true });
+    attachment.fields.push({title: 'Amount',       value: invoice.amount + '€', short: true });
+    attachment.fields.push({title: 'Capex',        value: invoice.capex,       short: true });
+    attachment.fields.push({title: 'Recurring',    value: invoice.recurring,       short: true });
+    attachments.push(attachment);
+    bot.reply(message, { attachments: attachments })
+  })
+})
+
 controller.hears('invoice', ['direct_message'], function (bot, message) {
   var iv = new Invoicer(config)
-  var sp = iv.getSpreadsheet()
-  var text = "Looks like i've got a spreadsheet:"
-  var attachments = [{
-    fallback: text,
-    pretext: 'We bring bots to life. :sunglasses: :thumbsup:',
-    title: 'Host, deploy and share your bot in seconds.',
-    image_url: 'https://storage.googleapis.com/beepboophq/_assets/bot-1.22f6fb.png',
-    title_link: 'https://beepboophq.com/',
-    text: text,
-    color: '#7CD197'
-  }]
-  bot.reply(message, {attachments: attachments})
+  var sp = iv.inputInvoice(message, function() {
+    bot.reply(message, 'Invoice saved!')
+  })
 })
 
 controller.on('bot_channel_join', function (bot, message) {

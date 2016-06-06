@@ -25,6 +25,8 @@
     "beepboop-botkit": "^1.4.0",
     "botkit": "~0.1.1",
     "google-spreadsheets": "^0.5",
-    "googleapis": "^7.1.0"
+    "googleapis": "^7.1.0",
+    "async": "^2.0.0-rc.5",
+    "moment": "^2.13.0"
   }
 }
